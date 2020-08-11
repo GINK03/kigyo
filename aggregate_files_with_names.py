@@ -38,7 +38,14 @@ if Path("./tmp/aggregate_files_tmp.csv").exists() and not Path("./tmp/idf.json")
     for soshiki, sub in df.groupby(by=["soshiki"]):
         subs.append(sub[:5000])
     df = pd.concat(subs)
-    to_idf = pd.concat([pd.read_csv(fname) for fname in tqdm(df.sample(frac=1)[:10000].fname.tolist(), desc="load idf samples...")])
+
+    tmps = []
+    for fname in tqdm(df.sample(frac=1)[:500000].fname.tolist(), desc="load idf samples..."):
+        try:
+            tmps.append(pd.read_csv(fname))
+        except Exception as exc:
+            print(exc)
+    to_idf = pd.concat(tmps)
     idf = Vectoring.get_idf(to_idf)
     print(idf)
     with open("./tmp/idf.json", "w") as fp:
@@ -51,9 +58,12 @@ if Path("./tmp/idf.json").exists() and Path("./tmp/aggregate_files_tmp.csv").exi
     def _wrap(arg):
         try:
             soshiki, sub = arg
+            if Path(f"./tmp/kigyos/{soshiki}.csv").exists():
+                return
             fnames = sub.fname.tolist()
             np.random.shuffle(fnames)
             df = pd.concat([pd.read_csv(fname) for fname in tqdm(fnames[:500000], desc=soshiki)])
+            df.drop_duplicates(subset=["status_url"], inplace=True)
             Vectoring.make_feats(df, idf, soshiki)
         except Exception as exc:
             print(exc)
@@ -61,6 +71,7 @@ if Path("./tmp/idf.json").exists() and Path("./tmp/aggregate_files_tmp.csv").exi
     args = []
     for soshiki, sub in df.groupby(by=["soshiki"]):
         args.append((soshiki, sub))
+    np.random.shuffle(args)
     # [_wrap(a) for a in args]
     with ProcessPoolExecutor(max_workers=16) as exe:
         for _ in exe.map(_wrap, args):
