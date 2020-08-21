@@ -8,7 +8,7 @@ import numpy as np
 import glob
 from pathlib import Path
 import json
-
+import os
 HOME = Path().home()
 TOP = Path(__file__).resolve().parent.parent.parent
 
@@ -24,10 +24,12 @@ def proc(users):
                 continue
 
             dfs = [pd.read_csv(user)]
-            for following in Path(HOME / f".mnt/cache/followings/{username}").glob("*"):
+            print(Path(HOME / f"nvme0n1/followings/{username}"))
+            for following in Path(HOME / f"nvme0n1/followings/{username}").glob("*"):
                 f = pd.read_csv(following)
+                print(len(f))
                 f = f.sample(frac=1)[:1000]
-                for ex_user in f.username:
+                for ex_user in tqdm(f.username, desc="now expantion..."):
                     ex_user = ex_user.replace("@", "").lower()
                     if not (TOP / f"tmp/users/each_tl/{ex_user}.gz").exists():
                         continue
@@ -55,10 +57,18 @@ if not Path("users.pkl").exists():
     with open("users.pkl", "wb") as fp:
         pickle.dump(users, fp)
 
-users = pickle.load(open("users.pkl", "rb"))
-args = np.array(users)
-np.random.shuffle(args)
-args = args[: len(args) // 1000 * 1000].reshape((1000, len(args) // 1000))
+if "TEST" in os.environ:
+    print(1)
+    users = []
+    for t in ["tjo_datasci", "0verfit", "mamas16k", "nardtree", "upura0", "yurfuwa", "nick_debu_p", "mizchi", "guiltydammy", "niszet0", "0_u0", "syakejs", "fumiya_kume", "baku_dreameater", "tawatawara", "hsjoihs"]:
+        users.append(f"../../tmp/users/each_tl/{t}.gz")
+    args = [users]
+
+else:
+    users = pickle.load(open("users.pkl", "rb"))
+    args = np.array(users)
+    np.random.shuffle(args)
+    args = args[: len(args) // 1000 * 1000].reshape((1000, len(args) // 1000))
 
 with ProcessPoolExecutor(max_workers=16) as exe:
     for _ in tqdm(exe.map(proc, args), total=len(args), desc="working..."):

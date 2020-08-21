@@ -7,6 +7,8 @@ import regex
 import Vectoring
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor
+from loguru import logger
+
 """
 Input: ./soshiki_sampler.py, ./search_kigyo_tweets.py's output and twitter data
 Output: each soshiki's term vectors
@@ -16,9 +18,11 @@ Output: each soshiki's term vectors
 3. calc soshiki's term vector and output
 """
 
-if not Path("./tmp/aggregate_files_tmp.csv").exists():
+TOP = Path(__file__).resolve().parent.parent.parent
+if not Path(TOP / "tmp/aggregate_files_tmp.csv").exists():
+    logger.info("start to create aggregate_files_tmp.csv...")
     objs = []
-    for u_dir in tqdm(glob.glob("./tmp/chunks/*")):
+    for u_dir in tqdm((TOP / "tmp/chunks/").glob("*")):
         uname = Path(u_dir).name
         for fname in glob.glob(f"{u_dir}/*"):
             obj = (fname, uname)
@@ -28,46 +32,35 @@ if not Path("./tmp/aggregate_files_tmp.csv").exists():
     a.columns = ["fname", "uname"]
     a["soshiki"] = a["fname"].apply(lambda x: x.split("/")[-1].replace(".gz", ""))
     a = a[a.soshiki.apply(lambda x: not regex.search("^\p{Hiragana}{1,}$", x))]
-    a.to_csv("./tmp/aggregate_files_tmp.csv", index=None)
+    a.to_csv(TOP / "tmp/aggregate_files_tmp.csv", index=None)
 
 
-if Path("./tmp/aggregate_files_tmp.csv").exists() and not Path("./tmp/idf.json").exists():
-    df = pd.read_csv("./tmp/aggregate_files_tmp.csv")
-    # サンプルの非対称を避けるため、5000に上限を決定
-    subs = []
-    for soshiki, sub in df.groupby(by=["soshiki"]):
-        subs.append(sub[:5000])
-    df = pd.concat(subs)
-
-    tmps = []
-    for fname in tqdm(df.sample(frac=1)[:500000].fname.tolist(), desc="load idf samples..."):
-        try:
-            tmps.append(pd.read_csv(fname))
-        except Exception as exc:
-            print(exc)
-    to_idf = pd.concat(tmps)
-    idf = Vectoring.get_idf(to_idf)
-    print(idf)
-    with open("./tmp/idf.json", "w") as fp:
+if Path(TOP / "tmp/aggregate_files_tmp.csv").exists() and not Path(TOP / "tmp/idf.json").exists():
+    logger.info("start to create tmp/idf.json...")
+    df = pd.read_csv(TOP / "tmp/aggregate_files_tmp.csv")
+    idf = Vectoring.get_idf(filenames=df.sample(frac=1).fname.tolist()[:1000000])
+    with open(TOP / "tmp/idf.json", "w") as fp:
         json.dump(idf, fp, indent=2, ensure_ascii=False)
 
-if Path("./tmp/idf.json").exists() and Path("./tmp/aggregate_files_tmp.csv").exists():
-    df = pd.read_csv("./tmp/aggregate_files_tmp.csv")
-    
-    idf = json.load(open("./tmp/idf.json"))
+if Path(TOP / "tmp/idf.json").exists() and Path(TOP / "tmp/aggregate_files_tmp.csv").exists():
+    logger.info("start to create each kigyos csv")
+    df = pd.read_csv(TOP / "tmp/aggregate_files_tmp.csv")
+
+    idf = json.load(open(TOP / "tmp/idf.json"))
+
     def _wrap(arg):
         try:
             soshiki, sub = arg
-            if Path(f"./tmp/kigyos/{soshiki}.csv").exists():
+            if Path(TOP / f"tmp/kigyos/{soshiki}.csv").exists():
                 return
             fnames = sub.fname.tolist()
             np.random.shuffle(fnames)
-            df = pd.concat([pd.read_csv(fname) for fname in tqdm(fnames[:500000], desc=soshiki)])
+            df = pd.concat([pd.read_csv(Path("~/sdb/kigyo/kigyo/tmp/chunks") / "/".join(fname.split("/")[-2:])) for fname in tqdm(fnames[:500000], desc=soshiki)])
             df.drop_duplicates(subset=["status_url"], inplace=True)
             Vectoring.make_feats(df, idf, soshiki)
         except Exception as exc:
             print(exc)
-    
+
     args = []
     for soshiki, sub in df.groupby(by=["soshiki"]):
         args.append((soshiki, sub))

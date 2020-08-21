@@ -15,7 +15,7 @@ from hashlib import sha256
 import random
 import pickle
 import mojimoji
-
+from loguru import logger
 """
 input: twitterのデータ
 output: 組織名と頻出回数のcsv
@@ -25,13 +25,17 @@ output: 組織名と頻出回数のcsv
 
 parser = MeCab.Tagger("-O chasen -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd")
 
-if Path("./tmp/temp_filenames.pkl").exists():
-    args = pickle.load(open("./tmp/temp_filenames.pkl", "rb"))
+TOP = Path(__file__).resolve().parent.parent.parent
+
+if Path(TOP / "tmp/temp_filenames.pkl").exists():
+    logger.info("load exists temp_filenames.pkl")
+    args = pickle.load(open(TOP / "tmp/temp_filenames.pkl", "rb"))
 else:
+    logger.info("create temp_filenames.pkl")
     sub_dirs = glob.glob(Path("~/.mnt/nfs/favs11/*").expanduser().__str__())
     sub_dirs = np.array(sub_dirs)
     args = sub_dirs[:len(sub_dirs)//1000 * 1000].reshape((len(sub_dirs)//1000, 1000))
-    with open("./tmp/temp_filenames.pkl", "wb") as fp:
+    with open(TOP / "tmp/temp_filenames.pkl", "wb") as fp:
         fp.write(pickle.dumps(args))
 
 def proc(sub_dirs):
@@ -57,7 +61,7 @@ def proc(sub_dirs):
                         text = mojimoji.zen_to_han(text, kana=False, digit=True, ascii=True)
                         p = parser.parse(text).strip().split("\n")
                         soshikis = [s.split("\t")[0] for s in p if "名詞-固有名詞-組織" in s]
-                        soshikis = [s for s in soshikis if re.search(r"^[a-z]{1,}$", s) is None and len(s) >= 3 and len(s)/len(set(s)) <= 1.5]
+                        soshikis = [s for s in soshikis if len(s) >= 3 and len(s)/len(set(s)) <= 1.5]
 
                         [put(s) for s in soshikis]
             except EOFError:
@@ -69,7 +73,6 @@ def proc(sub_dirs):
 ra = {}
 with ProcessPoolExecutor(max_workers=16) as exe:
     for idx, r in enumerate(tqdm(exe.map(proc, args[:500]), total=len(args))):
-        print(r)
         for s, f in r.items():
             if s not in ra:
                 ra[s] = 0
@@ -77,4 +80,4 @@ with ProcessPoolExecutor(max_workers=16) as exe:
 
 a = pd.DataFrame({"s": list(ra.keys()), "f": list(ra.values())})
 a.sort_values(by=["f"], ascending=False, inplace=True)
-a.to_csv("./tmp/soshikis.csv", index=None)
+a.to_csv(TOP / "tmp/soshikis.csv", index=None)
