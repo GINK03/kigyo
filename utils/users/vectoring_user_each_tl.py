@@ -58,6 +58,9 @@ def vectoring(user_dir):
         except EOFError as exc:
             Path(feed).unlink()
             continue
+        except gzip.BadGzipFile as exc:
+            Path(feed).unlink()
+            continue
         except Exception as exc:
             logger.error(exc)
     a = pd.DataFrame(objs)
@@ -82,9 +85,9 @@ def vectoring(user_dir):
             logger.error(exc)
     try:
         r = pd.DataFrame({"t": list(tf.keys()), "f": list(tf.values())}) 
-        r["w"] = [f/IDF[t] for f, t in zip(r.f, r.t)]
-        r["size"] = size
-        r.sort_values(by=["w"], ascending=False, inplace=True)
+        # r["w"] = [f/IDF[t] for f, t in zip(r.f, r.t)]
+        # r["size"] = size
+        r.sort_values(by=["f"], ascending=False, inplace=True)
         r.to_csv(TOP / f"tmp/users/each_tl/{username}.gz", compression="gzip", index=None)
     except Exception as exc:
         tmp = glob.glob(f"{user_dir}/FEEDS/*.gz")

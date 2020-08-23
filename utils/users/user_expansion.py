@@ -9,11 +9,16 @@ import glob
 from pathlib import Path
 import json
 import os
+import socket
 HOME = Path().home()
 TOP = Path(__file__).resolve().parent.parent.parent
 
 IDF = json.load(open(TOP / "tmp/idf.json"))
 
+if socket.gethostname() == "Kugayama": 
+    FOLLOWINGS = HOME / f"nvme0n1/followings/"
+else:
+    FOLLOWINGS = Path(f"~/.mnt/cache/followings/").expanduser()
 
 def proc(users):
     for user in users:
@@ -24,8 +29,7 @@ def proc(users):
                 continue
 
             dfs = [pd.read_csv(user)]
-            print(Path(HOME / f"nvme0n1/followings/{username}"))
-            for following in Path(HOME / f"nvme0n1/followings/{username}").glob("*"):
+            for following in Path(FOLLOWINGS / f"{username}").glob("*"):
                 f = pd.read_csv(following)
                 print(len(f))
                 f = f.sample(frac=1)[:1000]
@@ -37,13 +41,17 @@ def proc(users):
                     ex["f"] = ex["f"].apply(lambda x: 3 if x >= 3 else x)
                     dfs.append(ex)
                 break
+            
+            print( Path(FOLLOWINGS / f"{username}").exists())
+            # 協調　
+            dfs[0]["f"] *= max(int(len(dfs)*0.1), 1)
             df = pd.concat(dfs)
 
             c = df.groupby(by=["t"])["f"].sum().reset_index()
             c["sample_size"] = len(dfs)
             c["record_size"] = len(c)
             c.sort_values(by=["f"], ascending=False, inplace=True)
-            c = c[:2000]
+            c = c[:3000]
             c["w"] = [f / IDF[t] for f, t in zip(c.f, c.t)]
             c.sort_values(by=["w"], ascending=False, inplace=True)
             c.to_csv(TOP / f"tmp/users/user_expansion/{username}.gz", compression="gzip")
