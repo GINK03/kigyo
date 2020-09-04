@@ -72,6 +72,11 @@ if "TEST" in os.environ:
         users.append(f"../../tmp/users/each_tl/{t}.gz")
     args = [users]
 
+elif "TEST2" in os.environ:
+    tmp = pd.read_csv(Path("~/.mnt/20/sda/matching.jp/var/CollectUsernameFromFavorites.csv"))
+    usernames = tmp[:1000].username.apply(lambda x:x.lower())
+    args = [[f"../../tmp/users/each_tl/{username}.gz"] for username in usernames]
+
 else:
     users = pickle.load(open("users.pkl", "rb"))
     args = np.array(users)
