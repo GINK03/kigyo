@@ -38,7 +38,7 @@ if not Path(TOP / "tmp/aggregate_files_tmp.csv").exists():
 if Path(TOP / "tmp/aggregate_files_tmp.csv").exists() and not Path(TOP / "tmp/idf.json").exists():
     logger.info("start to create tmp/idf.json...")
     df = pd.read_csv(TOP / "tmp/aggregate_files_tmp.csv")
-    idf = Vectoring.get_idf(filenames=df.sample(frac=1).fname.tolist()[:1000000])
+    idf = Vectoring.get_idf(filenames=df.sample(frac=1).fname.tolist())
     with open(TOP / "tmp/idf.json", "w") as fp:
         json.dump(idf, fp, indent=2, ensure_ascii=False)
 

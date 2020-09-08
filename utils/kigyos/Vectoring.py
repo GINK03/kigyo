@@ -25,14 +25,17 @@ TOP = Path(__file__).resolve().parent.parent.parent
 def _set_to_docs(filenames):
     tmp = {}
     for filename in filenames:
-        df = pd.read_csv(filename)
-        df["text"] = df.text.apply(lambda x: mojimoji.zen_to_han(str(x), kana=False).lower()).apply(lambda x: mojimoji.han_to_zen(x, ascii=False, digit=False))
-        for text in df.text:
-            terms = set(parser.parse(text).strip().split())
-            for term in terms:
-                if term not in tmp:
-                    tmp[term] = 0
-                tmp[term] += 1
+        try:
+            df = pd.read_csv(filename)
+            df["text"] = df.text.apply(lambda x: mojimoji.zen_to_han(str(x), kana=False).lower()).apply(lambda x: mojimoji.han_to_zen(x, ascii=False, digit=False))
+            for text in df.text:
+                terms = set(parser.parse(text).strip().split())
+                for term in terms:
+                    if term not in tmp:
+                        tmp[term] = 0
+                    tmp[term] += 1
+        except Exception as exc:
+            print(exc)
     
     for term, freq in list(tmp.items()):
         detected = detector.parse(term)
@@ -47,8 +50,9 @@ def _set_to_docs(filenames):
     return tmp
 
 def get_idf(filenames):
-
-    args = np.array(filenames)
+    
+    max_len = max([len(x) for x in filenames])
+    args = np.array(filenames, dtype=f"U{max_len}")
     args = args[:len(args)//1000*1000].reshape((1000, len(args)//1000))
     docs = {}
     with ProcessPoolExecutor(max_workers=16) as exe:
