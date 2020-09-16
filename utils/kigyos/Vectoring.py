@@ -65,7 +65,7 @@ def get_idf(filenames):
     return docs
 
 def make_feats(df, idf, shoshiki_name):
-    print("calc weighting...", shoshiki_name)
+    # print("calc weighting...", shoshiki_name)
     parser = MeCab.Tagger("-O wakati -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd")
     detector = MeCab.Tagger("-O chasen -d /usr/lib/x86_64-linux-gnu/mecab/dic/mecab-ipadic-neologd")
     c = {}

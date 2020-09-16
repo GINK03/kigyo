@@ -14,13 +14,20 @@ import random
 import pickle
 import sys
 from loguru import logger
-
+import socket
 """
 Input: twitterのデータから組織名が含まれるツイートを取得
 Output: 組織名の前後N個のツイートを取得
 レアリティが高い組織のカバレッジを広げるためのロジック
 """
 TOP = Path(__file__).resolve().parent.parent.parent
+
+if socket.gethostname() in {"Kugayama"}:
+    TEMP_DIR = Path().home() / "sdc/tmp/chunks"
+else:
+    TEMP_DIR = Path().home() / ".mnt/22/sdc/tmp/chunks"
+
+TEMP_DIR.mkdir(exist_ok=True, parents=True)
 
 b = pd.read_csv(TOP / "tmp/soshikis.csv")
 b = b[:5000]
@@ -42,12 +49,12 @@ else:
         fp.write(pickle.dumps(args))
 
 name_freq = {}
-MAX_NAME_FREQ = 500
+MAX_NAME_FREQ = 5000
 def proc(sub_dirs):
     for sub_dir in tqdm(sub_dirs, desc="loading..", disable=True):
         try:
             username = Path(sub_dir).name
-            if Path(TOP / f"tmp/chunks/{username}").exists():
+            if Path(TEMP_DIR / f"{username}").exists():
                 logger.info(f"ok {username}")
                 continue
             name_datum = []
@@ -98,13 +105,14 @@ def proc(sub_dirs):
                 continue
             a.columns = ["status_url", "text", "words", "name", "freq"]
             a.drop(["words"], axis=1, inplace=True)
-            Path(TOP / f"tmp/chunks/{username}").mkdir(exist_ok=True, parents=True)
+            Path(TEMP_DIR / f"{username}").mkdir(exist_ok=True, parents=True)
             for name, sub in a.groupby(by=["name"]): 
-                sub.to_csv(TOP / f"tmp/chunks/{username}/{name}.gz", compression="gzip", index=None)
+                sub.to_csv(TEMP_DIR / f"{username}/{name}.bz2", compression="bz2", index=None)
+            logger.info(f"normally finished {username} {TEMP_DIR}")
         except Exception as exc:
             tb_lineno = sys.exc_info()[2].tb_lineno
-            logger.error("{exc}, {tb_lineno}")
+            logger.error(f"{exc}, {tb_lineno}")
 
-with ProcessPoolExecutor(max_workers=16) as exe:
+with ProcessPoolExecutor(max_workers=20) as exe:
     for idx, ret in enumerate(tqdm(exe.map(proc, args), total=len(args))):
-        print(idx)
+        idx
